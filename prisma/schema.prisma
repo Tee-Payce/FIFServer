@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  system_admin
+  posts_admin
+  library_admin
+  general_user
+}
+
+enum SubscriptionTier {
+  free
+  standard
+  premium
+  vvip
+}
+
+enum MediaType {
+  image
+  video
+  audio
+}
+
+enum EntityType {
+  book
+  sermon
+  story
+}
+
+enum ReactionType {
+  like
+  heart
+  prayer
+}
+
+model User {
+  id               String           @id @default(uuid())
+  name             String
+  email            String           @unique
+  password         String
+  role             Role             @default(general_user)
+  subscriptionTier SubscriptionTier @default(free)
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  
+  subscriptions    Subscription[]
+  stories          Story[]
+  comments         Comment[]
+  reactions        Reaction[]
+  purchases        Purchase[]
+}
+
+model Subscription {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  tier      SubscriptionTier
+  startDate DateTime         @default(now())
+  endDate   DateTime
+  isActive  Boolean          @default(true)
+}
+
+model Book {
+  id        String           @id @default(uuid())
+  title     String
+  author    String
+  category  SubscriptionTier
+  price     Float
+  pages     Int              @default(0)
+  fileUrl   String
+  createdAt DateTime         @default(now())
+  
+  purchases Purchase[]
+}
+
+model Sermon {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  videoUrl    String
+  duration    String
+  createdAt   DateTime @default(now())
+}
+
+model Story {
+  id        String    @id @default(uuid())
+  mediaUrl  String
+  mediaType MediaType
+  caption   String?
+  createdBy String
+  user      User      @relation(fields: [createdBy], references: [id])
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+}
+
+model Comment {
+  id         String     @id @default(uuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id])
+  entityType EntityType
+  entityId   String
+  content    String
+  createdAt  DateTime   @default(now())
+}
+
+model Reaction {
+  id         String       @id @default(uuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id])
+  entityType EntityType
+  entityId   String
+  type       ReactionType
+  createdAt  DateTime     @default(now())
+}
+
+model Purchase {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  bookId       String
+  book         Book     @relation(fields: [bookId], references: [id])
+  purchaseDate DateTime @default(now())
+}
+
+model Pricing {
+  id        String   @id // e.g., "standard", "premium", "vvip"
+  price     Float
+  updatedAt DateTime @updatedAt
+}
