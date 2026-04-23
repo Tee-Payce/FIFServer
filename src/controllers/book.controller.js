@@ -111,8 +111,8 @@ const secureDownload = async (req, res) => {
       return res.status(403).json({ message: 'You do not have access to this book' });
     }
 
-    const urlParts = book.fileUrl.split('/');
-    const fileName = urlParts.slice(5).join('/');
+    const urlObj = new URL(book.fileUrl);
+    const fileName = urlObj.pathname.substring(1); // remove leading slash
     const signedUrl = await getSignedUrl(fileName);
 
     res.status(200).json({ downloadUrl: signedUrl });

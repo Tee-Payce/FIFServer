@@ -67,8 +67,8 @@ const getActiveStories = async (req, res) => {
     // Generate signed URLs and format data
     const storiesWithSignedUrls = await Promise.all(stories.map(async (story) => {
       try {
-        const urlParts = story.mediaUrl.split('/');
-        const fileName = urlParts.slice(5).join('/');
+        const urlObj = new URL(story.mediaUrl);
+        const fileName = urlObj.pathname.substring(1); // remove leading slash
         const signedUrl = await getSignedUrl(fileName);
         
         const storyReactions = allReactions.filter(r => r.entityId === story.id);
