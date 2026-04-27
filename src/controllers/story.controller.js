@@ -27,8 +27,17 @@ const createStory = async (req, res) => {
       }
     });
 
+    // Generate signed URL before emitting so clients can render immediately
+    const signedUrl = await getSignedUrl(fileName);
+
     const { getIO } = require('../socket');
-    getIO().emit('story:created', story);
+    getIO().emit('story:created', {
+      ...story,
+      mediaUrl: signedUrl,
+      reactionCount: 0,
+      hasReacted: false,
+      userReactionType: null,
+    });
 
     res.status(201).json(story);
   } catch (error) {
@@ -64,20 +73,44 @@ const getActiveStories = async (req, res) => {
       }
     });
 
+    const commentCounts = await prisma.comment.groupBy({
+      by: ['entityId'],
+      where: {
+        entityType: 'story',
+        entityId: { in: storyIds }
+      },
+      _count: { id: true }
+    });
+
     // Generate signed URLs and format data
     const storiesWithSignedUrls = await Promise.all(stories.map(async (story) => {
       try {
-        const urlObj = new URL(story.mediaUrl);
-        const fileName = urlObj.pathname.substring(1); // remove leading slash
+        // Robust extraction of fileName from the URL
+        // Example URL: https://bucket.endpoint/stories/123-audio.mp3
+        // We need 'stories/123-audio.mp3'
+        let fileName = '';
+        try {
+          const urlObj = new URL(story.mediaUrl);
+          // For B2 S3-compatible URLs, pathname starts with /bucket/ (if path-style) or / (if virtual-host style)
+          // Our uploadFile returns https://bucket.endpoint/fileName
+          // So pathname is /fileName
+          fileName = decodeURIComponent(urlObj.pathname.substring(1));
+        } catch (e) {
+          // Fallback: if it's not a valid URL, maybe it's already a fileName or relative path
+          fileName = story.mediaUrl;
+        }
+
         const signedUrl = await getSignedUrl(fileName);
         
         const storyReactions = allReactions.filter(r => r.entityId === story.id);
         const userReaction = storyReactions.find(r => r.userId === userId);
+        const commentCountData = commentCounts.find(c => c.entityId === story.id);
 
         return { 
           ...story, 
           mediaUrl: signedUrl,
           reactionCount: storyReactions.length,
+          commentCount: commentCountData ? commentCountData._count.id : 0,
           hasReacted: !!userReaction,
           userReactionType: userReaction?.type || null
         };

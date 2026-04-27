@@ -1,5 +1,5 @@
 const express = require('express');
-const { getStats, getUsers, updateUser, deleteUser } = require('../controllers/admin.controller');
+const { getStats, getUsers, updateUser, deleteUser, getAllComments, getAllReviews } = require('../controllers/admin.controller');
 const { verifyToken, requireRole } = require('../middlewares/auth.middleware');
 const router = express.Router();
 
@@ -10,5 +10,8 @@ router.get('/stats', getStats);
 router.get('/users', getUsers);
 router.patch('/users/:id', updateUser);
 router.delete('/users/:id', deleteUser);
+
+router.get('/comments', getAllComments);
+router.get('/reviews', getAllReviews);
 
 module.exports = router;

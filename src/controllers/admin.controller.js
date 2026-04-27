@@ -149,9 +149,40 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const getAllComments = async (req, res) => {
+  try {
+    const comments = await prisma.comment.findMany({
+      include: {
+        user: { select: { name: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.status(200).json(comments);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching comments', error: error.message });
+  }
+};
+
+const getAllReviews = async (req, res) => {
+  try {
+    const reviews = await prisma.bookReview.findMany({
+      include: {
+        user: { select: { name: true, email: true } },
+        book: { select: { title: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.status(200).json(reviews);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching reviews', error: error.message });
+  }
+};
+
 module.exports = {
   getStats,
   getUsers,
   updateUser,
-  deleteUser
+  deleteUser,
+  getAllComments,
+  getAllReviews
 };

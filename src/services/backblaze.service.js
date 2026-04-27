@@ -10,6 +10,7 @@ const b2 = new B2({
 
 let isAuthorized = false;
 let downloadUrl = '';
+let bucketId = '';
 
 const authorize = async () => {
   if (isAuthorized) return;
@@ -17,7 +18,11 @@ const authorize = async () => {
     const response = await b2.authorize();
     isAuthorized = true;
     downloadUrl = response.data.downloadUrl;
-    console.log('Backblaze B2 Authorized');
+    
+    const bucketResponse = await b2.getBucket({ bucketName: process.env.B2_BUCKET_NAME });
+    bucketId = bucketResponse.data.buckets[0].bucketId;
+    
+    console.log('Backblaze B2 Authorized & Bucket ID cached');
   } catch (error) {
     console.error('B2 Authorization failed:', error.message);
     throw error;
@@ -27,9 +32,6 @@ const authorize = async () => {
 const uploadFile = async (fileBuffer, fileName, contentType) => {
   await authorize();
   try {
-    const bucketResponse = await b2.getBucket({ bucketName: process.env.B2_BUCKET_NAME });
-    const bucketId = bucketResponse.data.buckets[0].bucketId;
-
     const uploadUrlResponse = await b2.getUploadUrl({ bucketId });
     const { uploadUrl, authorizationToken } = uploadUrlResponse.data;
 
@@ -52,9 +54,6 @@ const uploadFile = async (fileBuffer, fileName, contentType) => {
 const getSignedUrl = async (fileName) => {
   await authorize();
   try {
-    const bucketResponse = await b2.getBucket({ bucketName: process.env.B2_BUCKET_NAME });
-    const bucketId = bucketResponse.data.buckets[0].bucketId;
-
     const response = await b2.getDownloadAuthorization({
       bucketId,
       fileNamePrefix: fileName,

@@ -54,6 +54,8 @@ model User {
   comments         Comment[]
   reactions        Reaction[]
   purchases        Purchase[]
+  commentReactions CommentReaction[]
+  bookReviews      BookReview[]
 }
 
 model Subscription {
@@ -77,6 +79,7 @@ model Book {
   createdAt DateTime         @default(now())
   
   purchases Purchase[]
+  reviews   BookReview[]
 }
 
 model Sermon {
@@ -107,6 +110,7 @@ model Comment {
   entityId   String
   content    String
   createdAt  DateTime   @default(now())
+  reactions  CommentReaction[]
 }
 
 model Reaction {
@@ -132,4 +136,25 @@ model Pricing {
   id        String   @id // e.g., "standard", "premium", "vvip"
   price     Float
   updatedAt DateTime @updatedAt
+}
+
+model CommentReaction {
+  id         String       @id @default(uuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id])
+  commentId  String
+  comment    Comment      @relation(fields: [commentId], references: [id])
+  type       ReactionType
+  createdAt  DateTime     @default(now())
+}
+
+model BookReview {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id])
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
 }

@@ -6,15 +6,28 @@ const getBooks = async (req, res) => {
   const { user } = req;
   
   try {
-    const books = await prisma.book.findMany();
+    const books = await prisma.book.findMany({
+      include: {
+        reviews: {
+          select: { rating: true }
+        }
+      }
+    });
     
-    // Generate signed URLs for book covers/files if needed
-    // Temporarily skip signing all URLs to prevent Network Error/Timeout
-    // and map cover field if it's missing (using a placeholder for now)
-    const formattedBooks = books.map(book => ({
-      ...book,
-      cover: book.fileUrl // Placeholder until schema has coverUrl
-    }));
+    const formattedBooks = books.map(book => {
+      const totalReviews = book.reviews.length;
+      const averageRating = totalReviews > 0
+        ? book.reviews.reduce((acc, curr) => acc + curr.rating, 0) / totalReviews
+        : 0;
+
+      return {
+        ...book,
+        cover: book.fileUrl,
+        averageRating: parseFloat(averageRating.toFixed(1)),
+        totalReviews,
+        reviews: undefined // don't send all reviews to the list
+      };
+    });
 
     res.status(200).json(formattedBooks);
   } catch (error) {
@@ -121,10 +134,92 @@ const secureDownload = async (req, res) => {
   }
 };
 
+const getBookReviews = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const reviews = await prisma.bookReview.findMany({
+      where: { bookId: id },
+      include: {
+        user: { select: { name: true, id: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const averageRating = reviews.length > 0
+      ? reviews.reduce((acc, curr) => acc + curr.rating, 0) / reviews.length
+      : 0;
+
+    res.status(200).json({
+      reviews,
+      averageRating: parseFloat(averageRating.toFixed(1)),
+      totalReviews: reviews.length
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching reviews', error: error.message });
+  }
+};
+
+const addBookReview = async (req, res) => {
+  const { id } = req.params;
+  const { rating, comment } = req.body;
+  const userId = req.user.id;
+
+  try {
+    const existing = await prisma.bookReview.findFirst({
+      where: { bookId: id, userId }
+    });
+
+    if (existing) {
+      return res.status(400).json({ message: 'You have already reviewed this book.' });
+    }
+
+    const review = await prisma.bookReview.create({
+      data: {
+        rating,
+        comment,
+        bookId: id,
+        userId
+      },
+      include: {
+        user: { select: { name: true, id: true } }
+      }
+    });
+
+    const { getIO } = require('../socket');
+    getIO().emit('review:created', review);
+
+    res.status(201).json(review);
+  } catch (error) {
+    res.status(500).json({ message: 'Error adding review', error: error.message });
+  }
+};
+
+const deleteBookReview = async (req, res) => {
+  const { reviewId } = req.params;
+  try {
+    const review = await prisma.bookReview.findUnique({ where: { id: reviewId } });
+    if (!review) return res.status(404).json({ message: 'Review not found' });
+    
+    // Only admins or the owner can delete
+    if (review.userId !== req.user.id && req.user.role === 'general_user') {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    await prisma.bookReview.delete({ where: { id: reviewId } });
+    
+    res.status(200).json({ message: 'Review deleted' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting review', error: error.message });
+  }
+};
+
 module.exports = {
   getBooks,
   createBook,
   getBookById,
   deleteBook,
   secureDownload,
+  getBookReviews,
+  addBookReview,
+  deleteBookReview
 };

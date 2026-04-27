@@ -13,33 +13,55 @@ const addReaction = async (req, res) => {
 
     if (existingReaction) {
       if (existingReaction.type === type) {
-        // Toggle off: remove reaction if same type
         await prisma.reaction.delete({ where: { id: existingReaction.id } });
       } else {
-        // Update type: if different type
         await prisma.reaction.update({
           where: { id: existingReaction.id },
           data: { type }
         });
       }
     } else {
-      // Create new
       await prisma.reaction.create({
         data: { type, entityId, entityType, userId }
       });
     }
 
-    // Fetch updated count
     const count = await prisma.reaction.count({
       where: { entityId, entityType }
     });
 
-    // Broadcast the updated count and entity info to everyone
     getIO().emit('reaction:update', { entityId, entityType, count });
-
     res.status(200).json({ message: 'Reaction updated', count });
   } catch (error) {
     res.status(500).json({ message: 'Error processing reaction', error: error.message });
+  }
+};
+
+const getComments = async (req, res) => {
+  const { entityType, entityId } = req.query;
+  const userId = req.user.id;
+  try {
+    const comments = await prisma.comment.findMany({
+      where: { entityType, entityId },
+      include: {
+        user: { select: { name: true, id: true } },
+        reactions: true
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    const formattedComments = comments.map(comment => {
+      const userReaction = comment.reactions.find(r => r.userId === userId);
+      return {
+        ...comment,
+        reactionCount: comment.reactions.length,
+        userReactionType: userReaction ? userReaction.type : null,
+      };
+    });
+
+    res.status(200).json(formattedComments);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching comments', error: error.message });
   }
 };
 
@@ -54,20 +76,78 @@ const addComment = async (req, res) => {
         userId: req.user.id
       },
       include: {
-        user: { select: { name: true } }
+        user: { select: { name: true, id: true } },
+        reactions: true
       }
     });
 
-    // Broadcast to the specific entity room
-    getIO().to(`${entityType}:${entityId}`).emit('comment:created', comment);
+    const formattedComment = {
+      ...comment,
+      reactionCount: 0,
+      userReactionType: null
+    };
 
-    res.status(201).json(comment);
+    getIO().to(`${entityType}:${entityId}`).emit('comment:created', formattedComment);
+    res.status(201).json(formattedComment);
   } catch (error) {
     res.status(500).json({ message: 'Error adding comment', error: error.message });
   }
 };
 
+const deleteComment = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const comment = await prisma.comment.findUnique({ where: { id } });
+    if (!comment) return res.status(404).json({ message: 'Comment not found' });
+    if (comment.userId !== req.user.id && req.user.role === 'general_user') {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    await prisma.comment.delete({ where: { id } });
+    getIO().to(`${comment.entityType}:${comment.entityId}`).emit('comment:deleted', id);
+    res.status(200).json({ message: 'Comment deleted' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting comment', error: error.message });
+  }
+};
+
+const reactToComment = async (req, res) => {
+  const { id } = req.params;
+  const { type } = req.body;
+  const userId = req.user.id;
+
+  try {
+    const existing = await prisma.commentReaction.findFirst({
+      where: { userId, commentId: id }
+    });
+
+    if (existing) {
+      if (existing.type === type) {
+        await prisma.commentReaction.delete({ where: { id: existing.id } });
+      } else {
+        await prisma.commentReaction.update({
+          where: { id: existing.id },
+          data: { type }
+        });
+      }
+    } else {
+      await prisma.commentReaction.create({
+        data: { type, commentId: id, userId }
+      });
+    }
+
+    const count = await prisma.commentReaction.count({ where: { commentId: id } });
+    getIO().emit('comment:reaction:update', { commentId: id, count });
+    res.status(200).json({ message: 'Reaction updated', count });
+  } catch (error) {
+    res.status(500).json({ message: 'Error reacting', error: error.message });
+  }
+};
+
 module.exports = {
   addReaction,
-  addComment
+  addComment,
+  getComments,
+  deleteComment,
+  reactToComment
 };
