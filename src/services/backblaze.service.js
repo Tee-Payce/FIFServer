@@ -9,24 +9,35 @@ const b2 = new B2({
 });
 
 let isAuthorized = false;
+let authPromise = null;
 let downloadUrl = '';
 let bucketId = '';
 
 const authorize = async () => {
   if (isAuthorized) return;
-  try {
-    const response = await b2.authorize();
-    isAuthorized = true;
-    downloadUrl = response.data.downloadUrl;
-    
-    const bucketResponse = await b2.getBucket({ bucketName: process.env.B2_BUCKET_NAME });
-    bucketId = bucketResponse.data.buckets[0].bucketId;
-    
-    console.log('Backblaze B2 Authorized & Bucket ID cached');
-  } catch (error) {
-    console.error('B2 Authorization failed:', error.message);
-    throw error;
-  }
+  
+  if (authPromise) return authPromise;
+
+  authPromise = (async () => {
+    try {
+      const response = await b2.authorize();
+      downloadUrl = response.data.downloadUrl;
+      
+      const bucketResponse = await b2.getBucket({ bucketName: process.env.B2_BUCKET_NAME });
+      bucketId = bucketResponse.data.buckets[0].bucketId;
+      
+      isAuthorized = true;
+      authPromise = null;
+      console.log('Backblaze B2 Authorized & Bucket ID cached');
+    } catch (error) {
+      isAuthorized = false;
+      authPromise = null;
+      console.error('B2 Authorization failed:', error.message);
+      throw error;
+    }
+  })();
+
+  return authPromise;
 };
 
 const uploadFile = async (fileBuffer, fileName, contentType) => {

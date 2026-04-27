@@ -133,6 +133,11 @@ const updateUser = async (req, res) => {
         isActive
       }
     });
+
+    // Notify the user via socket
+    const { getIO } = require('../socket');
+    getIO().to(`user:${id}`).emit('user:updated', user);
+
     res.status(200).json(user);
   } catch (error) {
     res.status(500).json({ message: 'Error updating user', error: error.message });

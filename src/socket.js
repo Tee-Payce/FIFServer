@@ -24,7 +24,11 @@ const initSocket = (server) => {
   });
 
   io.on('connection', (socket) => {
+    const userId = socket.user.id;
     console.log(`User connected: ${socket.user.email} (${socket.id})`);
+
+    // Automatically join a private room for this user
+    socket.join(`user:${userId}`);
 
     socket.on('join', (room) => {
       socket.join(room);

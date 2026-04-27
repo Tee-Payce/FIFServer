@@ -83,12 +83,14 @@ model Book {
 }
 
 model Sermon {
-  id          String   @id @default(uuid())
-  title       String
-  description String
-  videoUrl    String
-  duration    String
-  createdAt   DateTime @default(now())
+  id           String   @id @default(uuid())
+  title        String
+  description  String
+  videoUrl     String
+  videoType    String   @default("upload") // "upload" or "url"
+  duration     String
+  thumbnailUrl String?
+  createdAt    DateTime @default(now())
 }
 
 model Story {

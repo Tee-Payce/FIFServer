@@ -21,6 +21,6 @@ router.delete('/reviews/:reviewId', verifyToken, requireRole(['system_admin', 'l
 
 // Sermons
 router.get('/sermons', verifyToken, getSermons);
-router.post('/sermons', verifyToken, requireRole(['system_admin', 'library_admin']), createSermon);
+router.post('/sermons', verifyToken, requireRole(['system_admin', 'library_admin']), upload.fields([{ name: 'video', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), createSermon);
 
 module.exports = router;
