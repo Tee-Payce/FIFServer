@@ -10,7 +10,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 // Books
 router.get('/books', verifyToken, getBooks);
 router.get('/books/:id', verifyToken, getBookById);
-router.post('/books', verifyToken, requireRole(['system_admin', 'library_admin']), upload.single('book'), createBook);
+router.post('/books', verifyToken, requireRole(['system_admin', 'library_admin']), upload.fields([{ name: 'book', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), createBook);
 router.delete('/books/:id', verifyToken, requireRole(['system_admin', 'library_admin']), deleteBook);
 router.get('/secure/book/:id', verifyToken, secureDownload);
 
@@ -21,6 +21,6 @@ router.delete('/reviews/:reviewId', verifyToken, requireRole(['system_admin', 'l
 
 // Sermons
 router.get('/sermons', verifyToken, getSermons);
-router.post('/sermons', verifyToken, requireRole(['system_admin', 'library_admin']), createSermon);
+router.post('/sermons', verifyToken, requireRole(['system_admin', 'library_admin']), upload.single('thumbnail'), createSermon);
 
 module.exports = router;

@@ -76,6 +76,7 @@ model Book {
   price     Float
   pages     Int              @default(0)
   fileUrl   String
+  coverUrl  String?
   createdAt DateTime         @default(now())
   
   purchases Purchase[]
@@ -88,6 +89,8 @@ model Sermon {
   description String
   videoUrl    String
   duration    String
+  videoType   String   @default("url")
+  coverUrl    String?
   createdAt   DateTime @default(now())
 }
 

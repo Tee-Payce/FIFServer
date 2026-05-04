@@ -43,8 +43,9 @@ const uploadFile = async (fileBuffer, fileName, contentType) => {
       contentType,
     });
 
-    // Return the S3-compatible URL
-    return `https://${process.env.B2_BUCKET_NAME}.${process.env.B2_ENDPOINT}/${fileName}`;
+    // Return the S3-compatible URL with encoded filename
+    const encodedFileName = fileName.split('/').map(part => encodeURIComponent(part)).join('/');
+    return `https://${process.env.B2_BUCKET_NAME}.${process.env.B2_ENDPOINT}/${encodedFileName}`;
   } catch (error) {
     console.error('B2 Upload failed:', error.message);
     throw error;

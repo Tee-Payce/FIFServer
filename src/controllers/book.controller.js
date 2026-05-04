@@ -14,20 +14,31 @@ const getBooks = async (req, res) => {
       }
     });
     
-    const formattedBooks = books.map(book => {
+    const formattedBooks = await Promise.all(books.map(async (book) => {
       const totalReviews = book.reviews.length;
       const averageRating = totalReviews > 0
         ? book.reviews.reduce((acc, curr) => acc + curr.rating, 0) / totalReviews
         : 0;
 
+      let cover = book.coverUrl;
+      if (cover) {
+        try {
+          const urlObj = new URL(cover);
+          const fileName = decodeURIComponent(urlObj.pathname.substring(1));
+          cover = await getSignedUrl(fileName);
+        } catch (err) {
+          console.error("Failed to sign book cover:", err.message);
+        }
+      }
+
       return {
         ...book,
-        cover: book.fileUrl,
+        cover,
         averageRating: parseFloat(averageRating.toFixed(1)),
         totalReviews,
         reviews: undefined // don't send all reviews to the list
       };
-    });
+    }));
 
     res.status(200).json(formattedBooks);
   } catch (error) {
@@ -38,15 +49,23 @@ const getBooks = async (req, res) => {
 
 const createBook = async (req, res) => {
   const { title, author, category, price, pages } = req.body;
-  const file = req.file;
+  
+  const bookFile = req.files && req.files.book ? req.files.book[0] : null;
+  const coverFile = req.files && req.files.cover ? req.files.cover[0] : null;
 
-  if (!file) {
+  if (!bookFile) {
     return res.status(400).json({ message: 'Book file is required' });
   }
 
   try {
-    const fileName = `books/${Date.now()}-${file.originalname}`;
-    const fileUrl = await uploadFile(file.buffer, fileName, file.mimetype);
+    const fileName = `books/${Date.now()}-${bookFile.originalname}`;
+    const fileUrl = await uploadFile(bookFile.buffer, fileName, bookFile.mimetype);
+
+    let coverUrl = null;
+    if (coverFile) {
+      const coverName = `covers/books/${Date.now()}-${coverFile.originalname}`;
+      coverUrl = await uploadFile(coverFile.buffer, coverName, coverFile.mimetype);
+    }
 
     const book = await prisma.book.create({
       data: {
@@ -56,11 +75,17 @@ const createBook = async (req, res) => {
         price: parseFloat(price) || 0,
         pages: parseInt(pages) || 0,
         fileUrl,
+        coverUrl,
       },
     });
 
     const { getIO } = require('../socket');
-    getIO().emit('book:created', book);
+    getIO().emit('book:created', {
+      ...book,
+      cover: book.coverUrl,
+      averageRating: 0,
+      totalReviews: 0
+    });
 
     res.status(201).json(book);
   } catch (error) {
