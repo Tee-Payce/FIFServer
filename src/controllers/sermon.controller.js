@@ -18,6 +18,10 @@ const createSermon = async (req, res) => {
     const sermon = await prisma.sermon.create({
       data: { title, description, videoUrl, duration }
     });
+    
+    const { getIO } = require('../socket');
+    getIO().emit('sermon:created', sermon);
+
     res.status(201).json(sermon);
   } catch (error) {
     res.status(500).json({ message: 'Error creating sermon', error: error.message });
