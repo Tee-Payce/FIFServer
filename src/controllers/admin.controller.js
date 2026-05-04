@@ -133,6 +133,11 @@ const updateUser = async (req, res) => {
         isActive
       }
     });
+
+    // Emit event to the user's private room so the app updates in real-time
+    const { getIO } = require('../socket');
+    getIO().to(id).emit('user:updated', user);
+
     res.status(200).json(user);
   } catch (error) {
     res.status(500).json({ message: 'Error updating user', error: error.message });
