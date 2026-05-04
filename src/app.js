@@ -34,6 +34,10 @@ app.use('/admin', adminRoutes);
 app.use('/pricing', pricingRoutes);
 app.use('/', interactionRoutes);
 
+app.get("/health", (req, res) => {
+  res.send("FIF Backend is live 🚀");
+});
+
 // Error Handling
 app.use((err, req, res, next) => {
   console.error(err.stack);
